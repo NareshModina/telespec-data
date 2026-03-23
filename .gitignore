@@ -1,0 +1,17 @@
+# Dataset files
+data/
+etsi-dataset/
+telespec-dataset/
+*.parquet
+*.arrow
+*.json
+etsi_skipped*.txt
+etsi_audit_report*
+missing_files.log
+organize_by_working_group.log
+
+# HuggingFace dataset card (kept separately)
+README_hf.md
+
+# macOS
+.DS_Store
