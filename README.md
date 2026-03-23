@@ -72,4 +72,4 @@ ds = load_dataset("NareshModina/TeleSpec-Data", name="3gpp-standard")  # 3GPP on
 
 ## License
 
-CC BY-NC 4.0 — see [LICENSE](LICENSE) for details.
+CC BY-NC 4.0 — see [LICENSE](https://creativecommons.org/licenses/by-nc/4.0/deed.en) for details.
