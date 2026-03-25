@@ -40,9 +40,7 @@ import random
 
 from datasets import (
     Dataset,
-    DatasetDict,
     concatenate_datasets,
-    load_dataset,
     load_from_disk,
 )
 from huggingface_hub import HfApi
@@ -52,9 +50,7 @@ from huggingface_hub import HfApi
 # Constants
 # ===========================================================================
 
-TELE_DATA_REPO   = "AliMaatouk/Tele-Data"
-TELE_DATA_SUBSET = "standard"
-RANDOM_SEED      = 42
+RANDOM_SEED = 42
 
 # Canonical columns — must match exactly in both subsets
 COLUMNS = ["id", "category", "content", "metadata"]
@@ -101,12 +97,12 @@ def print_sample(ds: Dataset, category: str, n: int = 2):
 # Step 1 — Load and prepare 3GPP subset from Tele-Data
 # ===========================================================================
 
-def load_3gpp(sample: int = None) -> Dataset:
+def load_3gpp(gpp_dir: str, sample: int = None) -> Dataset:
     print(f"\n{'='*60}")
-    print(f"  Loading 3GPP subset from {TELE_DATA_REPO} ...")
+    print(f"  Loading 3GPP dataset from {gpp_dir} ...")
     print(f"{'='*60}")
 
-    ds = load_dataset(TELE_DATA_REPO, name=TELE_DATA_SUBSET, split="train")
+    ds = load_from_disk(gpp_dir)
     print(f"  Loaded {len(ds):,} records")
     print(f"  Columns: {ds.column_names}")
 
@@ -114,30 +110,20 @@ def load_3gpp(sample: int = None) -> Dataset:
         ds = ds.select(range(min(sample, len(ds))))
         print(f"  Sampled {len(ds):,} records for testing")
 
-    # Remap category: "standard" → "3gpp-standard"
-    print("  Remapping category: 'standard' → '3gpp-standard' ...")
-    ds = ds.map(
-        lambda x: {"category": "3gpp-standard"},
-        desc="  remapping category"
-    )
+    # Verify category
+    categories = set(ds.unique("category"))
+    print(f"  Categories found: {categories}")
+    if categories != {"3gpp-standard"}:
+        print(f"  Remapping all to '3gpp-standard' ...")
+        ds = ds.map(lambda x: {"category": "3gpp-standard"},
+                    desc="  remapping category")
 
-    # Normalise content separators: Tele-Data uses \n\n, ETSI uses " \n " — align to " \n "
+    # Normalise \n\n → " \n " for consistency with ETSI content
     print("  Normalising content separators...")
     ds = ds.map(
         lambda x: {"content": x["content"].replace("\n\n", " \n ")},
         desc="  normalising content"
     )
-
-    # Normalise columns to canonical schema
-    # Tele-Data uses uppercase: ID, Category, Content, Metadata
-    # Rename to lowercase if needed
-    rename_map = {}
-    for col in ds.column_names:
-        if col.lower() in COLUMNS and col not in COLUMNS:
-            rename_map[col] = col.lower()
-    if rename_map:
-        print(f"  Renaming columns: {rename_map}")
-        ds = ds.rename_columns(rename_map)
 
     ds = normalise_columns(ds, COLUMNS)
 
@@ -298,6 +284,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Build TeleSpec-Data by combining Tele-Data 3GPP + ETSI dataset"
     )
+    parser.add_argument("--gpp-dir",    required=True,
+                        help="Path to local 3GPP Arrow dataset (./3gpp-dataset/train)")
     parser.add_argument("--etsi-dir",   required=True,
                         help="Path to local ETSI Arrow dataset (./etsi-dataset/train)")
     parser.add_argument("--output-dir", default="./telespec-dataset",
@@ -317,6 +305,7 @@ def main():
     print(f"\n{'='*60}")
     print(f"  TeleSpec-Data Dataset Builder")
     print(f"{'='*60}")
+    print(f"  3GPP dir   : {args.gpp_dir}")
     print(f"  ETSI dir   : {args.etsi_dir}")
     print(f"  Output dir : {args.output_dir}")
     print(f"  Repo ID    : {args.repo_id}")
@@ -324,7 +313,7 @@ def main():
     print(f"  Sample     : {args.sample or 'all'}")
 
     # ── Load ─────────────────────────────────────────────────────────────
-    gpp_ds  = load_3gpp(sample=args.sample)
+    gpp_ds  = load_3gpp(args.gpp_dir, sample=args.sample)
     etsi_ds = load_etsi(args.etsi_dir, sample=args.sample)
 
     # ── Combine for verification ──────────────────────────────────────────
